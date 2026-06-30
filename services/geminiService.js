@@ -1,5 +1,6 @@
 const { GoogleGenAI } = require('@google/genai');
 const config = require('../config');
+const logger = require('./logger');
 
 class GeminiService {
   constructor() {
@@ -17,9 +18,12 @@ class GeminiService {
    * @returns {Promise<{text: string, json: Object}>}
    */
   async transcribeAudio(audioGcsPath) {
+    const startTime = Date.now();
     try {
       const gcsUri = `gs://${config.gcsBucketName}/${audioGcsPath}`;
-      console.log(`[Gemini] Requesting transcription for GCS file: ${gcsUri}`);
+      logger.log(`[Gemini] Starting transcription process...`);
+      logger.log(`[Gemini] Target GCS URI: "${gcsUri}"`);
+      logger.log(`[Gemini] Model configuration: "${this.model}"`);
 
       const prompt = `
         Provide a complete, word-for-word transcript of this audio file.
@@ -40,6 +44,7 @@ class GeminiService {
         }
       `;
 
+      logger.log(`[Gemini] Calling Gemini generateContent API (this might take a few moments)...`);
       const response = await this.client.models.generateContent({
         model: this.model,
         contents: [
@@ -64,16 +69,26 @@ class GeminiService {
         }
       });
 
+      const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+      logger.log(`[Gemini] API Response received in ${duration}s.`);
+
       const rawText = response?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!rawText) {
+        logger.error('[Gemini] Failed response structure: ', JSON.stringify(response, null, 2));
         throw new Error('Received empty response from Gemini API');
       }
+
+      logger.log(`[Gemini] Raw response text length: ${rawText.length} characters.`);
+      logger.log(`[Gemini] Response snippet: \n---\n${rawText.substring(0, 300)}${rawText.length > 300 ? '\n...[truncated]...' : ''}\n---`);
 
       let parsedJson;
       try {
         parsedJson = JSON.parse(rawText.trim());
+        logger.log(`[Gemini] Successfully parsed response as valid JSON.`);
+        logger.log(`[Gemini] Combined text word count: ${parsedJson.fullText?.split(/\s+/).length || 0} words.`);
+        logger.log(`[Gemini] Segment count detected: ${parsedJson.segments?.length || 0} segments.`);
       } catch (err) {
-        console.warn('[Gemini] Response was not valid JSON, falling back to raw text. Raw output:', rawText);
+        logger.warn('[Gemini] Response was not valid JSON, falling back to raw text. Raw output:', rawText);
         parsedJson = {
           fullText: rawText,
           segments: []
@@ -90,12 +105,13 @@ class GeminiService {
         plainText = parsedJson.fullText;
       }
 
+      logger.log('[Gemini] Finished formatting transcription output.');
       return {
         text: plainText,
         json: parsedJson
       };
     } catch (error) {
-      console.error('[Gemini] Transcription error:', error);
+      logger.error('[Gemini] Transcription error:', error);
       throw error;
     }
   }

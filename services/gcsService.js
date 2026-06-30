@@ -1,5 +1,6 @@
 const { Storage } = require('@google-cloud/storage');
 const config = require('../config');
+const logger = require('./logger');
 
 class GCSService {
   constructor() {
@@ -15,6 +16,7 @@ class GCSService {
    * @returns {NodeJS.ReadableStream}
    */
   createReadStream(gcsPath) {
+    logger.log(`[GCS] Opening readable stream for file: "gs://${config.gcsBucketName}/${gcsPath}"`);
     return this.bucket.file(gcsPath).createReadStream();
   }
 
@@ -25,6 +27,7 @@ class GCSService {
    * @returns {NodeJS.WritableStream}
    */
   createWriteStream(gcsPath, contentType) {
+    logger.log(`[GCS] Opening writable stream for file: "gs://${config.gcsBucketName}/${gcsPath}" (Content-Type: ${contentType})`);
     return this.bucket.file(gcsPath).createWriteStream({
       metadata: {
         contentType,
@@ -52,10 +55,10 @@ class GCSService {
           }
         }
       });
-      console.log(`[GCS] Uploaded file: ${gcsPath}`);
+      logger.log(`[GCS] Uploaded file: ${gcsPath}`);
       return { success: true, gcsPath };
     } catch (error) {
-      console.error(`[GCS] Upload error for ${gcsPath}:`, error);
+      logger.error(`[GCS] Upload error for ${gcsPath}:`, error);
       throw error;
     }
   }
@@ -77,9 +80,9 @@ class GCSService {
     };
     try {
       await this.uploadText(statusGcsPath, JSON.stringify(payload, null, 2), 'application/json');
-      console.log(`[GCS] Status updated to '${status}' for video: ${videoGcsPath}`);
+      logger.log(`[GCS] Status updated to '${status}' for video: ${videoGcsPath}`);
     } catch (err) {
-      console.error(`[GCS] Failed to update status for ${videoGcsPath}:`, err);
+      logger.error(`[GCS] Failed to update status for ${videoGcsPath}:`, err);
     }
   }
 
@@ -93,12 +96,12 @@ class GCSService {
       const [exists] = await file.exists();
       if (exists) {
         await file.delete();
-        console.log(`[GCS] Deleted file: ${gcsPath}`);
+        logger.log(`[GCS] Deleted file: ${gcsPath}`);
         return true;
       }
       return false;
     } catch (error) {
-      console.error(`[GCS] Delete error for ${gcsPath}:`, error);
+      logger.error(`[GCS] Delete error for ${gcsPath}:`, error);
       throw error;
     }
   }

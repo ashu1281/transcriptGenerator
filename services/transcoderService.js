@@ -1,5 +1,9 @@
 const path = require('path');
 const ffmpeg = require('fluent-ffmpeg');
+const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+const logger = require('./logger');
+
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 class TranscoderService {
   /**
@@ -24,20 +28,22 @@ class TranscoderService {
         .audioChannels(1)
         .audioFrequency(16000)
         .on('start', (commandLine) => {
-          console.log(`[Transcoder] Spawned ffmpeg with command: ${commandLine}`);
+          logger.log(`[Transcoder] Spawned ffmpeg with command: ${commandLine}`);
         })
         .on('progress', (progress) => {
           if (progress.percent !== undefined) {
-            console.log(`[Transcoder] Processing: ${Math.round(progress.percent)}% done`);
+            logger.log(`[Transcoder] Processing: ${Math.round(progress.percent)}% done (timemark: ${progress.timemark})`);
+          } else {
+            logger.log(`[Transcoder] Processing stream... (current timemark: ${progress.timemark})`);
           }
         })
         .on('error', (err, stdout, stderr) => {
-          console.error('[Transcoder] ffmpeg error:', err.message);
-          console.error('[Transcoder] ffmpeg stderr:', stderr);
+          logger.error('[Transcoder] ffmpeg error:', err.message);
+          logger.error('[Transcoder] ffmpeg stderr:', stderr);
           reject(err);
         })
         .on('end', () => {
-          console.log('[Transcoder] Audio extraction finished successfully');
+          logger.log('[Transcoder] Audio extraction finished successfully.');
           resolve();
         })
         .pipe(writeStream, { end: true });

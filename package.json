@@ -5,9 +5,10 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon --watch . --watch .env --watch .env.development --ext js,json server.js"
   },
   "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@google-cloud/pubsub": "^5.3.1",
     "@google-cloud/storage": "^7.21.0",
     "@google/genai": "^2.10.0",
