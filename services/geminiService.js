@@ -27,7 +27,7 @@ class GeminiService {
 
       const prompt = `
         Provide a complete, word-for-word transcript of this audio file.
-        Detect distinct speakers and label them (e.g., "Speaker A", "Speaker B").
+        Identify the distinct speakers. If the speakers introduce themselves or are referred to by name in the conversation, use their actual names as labels (e.g., "Ashish", "John"). If their names cannot be determined from the audio, fall back to "Speaker A", "Speaker B", etc.
         Include approximate start and end timestamps for each segment.
 
         Return ONLY a JSON object matching this schema (do not wrap in markdown):
@@ -35,7 +35,7 @@ class GeminiService {
           "fullText": "the entire combined transcript text",
           "segments": [
             {
-              "speaker": "Speaker A",
+              "speaker": "Name of Speaker or Speaker A",
               "text": "text spoken in this segment...",
               "start": "00:00:15",
               "end": "00:00:25"

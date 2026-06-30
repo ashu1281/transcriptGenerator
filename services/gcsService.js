@@ -64,13 +64,13 @@ class GCSService {
   }
 
   /**
-   * Write status JSON file next to the video file
+   * Write status JSON file inside target output folder
+   * @param {string} statusGcsPath - Custom target path for the status JSON
    * @param {string} videoGcsPath - Path of original video in GCS
    * @param {'processing' | 'completed' | 'failed'} status - Current status
    * @param {string} [errorMsg] - Error description if failed
    */
-  async updateStatus(videoGcsPath, status, errorMsg = null) {
-    const statusGcsPath = `${videoGcsPath}.status.json`;
+  async updateStatus(statusGcsPath, videoGcsPath, status, errorMsg = null) {
     const payload = {
       videoFile: videoGcsPath.split('/').pop(),
       bucket: config.gcsBucketName,
@@ -80,9 +80,9 @@ class GCSService {
     };
     try {
       await this.uploadText(statusGcsPath, JSON.stringify(payload, null, 2), 'application/json');
-      logger.log(`[GCS] Status updated to '${status}' for video: ${videoGcsPath}`);
+      logger.log(`[GCS] Status updated to '${status}' at: ${statusGcsPath}`);
     } catch (err) {
-      logger.error(`[GCS] Failed to update status for ${videoGcsPath}:`, err);
+      logger.error(`[GCS] Failed to update status at ${statusGcsPath}:`, err);
     }
   }
 

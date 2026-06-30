@@ -79,15 +79,25 @@ router.post('/gcs', verifyPubSubToken, async (req, res) => {
 async function processVideoBackground(name, size) {
   logger.log(`[Pipeline] Starting background job for: ${name} (${size} bytes)`);
   
-  // Define GCS file paths
-  const tempAudioPath = `${name}.temp.wav`;
-  const baseName = name.replace(/\.[^/.]+$/, ''); // Removes extension (e.g. video.mp4 -> video)
-  const txtTranscriptPath = `${baseName}.transcript.txt`;
-  const jsonTranscriptPath = `${baseName}.transcript.json`;
+  // Parse GCS path components using cross-platform safe string manipulation
+  const lastSlashIndex = name.lastIndexOf('/');
+  const dirName = lastSlashIndex !== -1 ? name.substring(0, lastSlashIndex) : '';
+  const fileName = lastSlashIndex !== -1 ? name.substring(lastSlashIndex + 1) : name;
+  const lastDotIndex = fileName.lastIndexOf('.');
+  const baseName = lastDotIndex !== -1 ? fileName.substring(0, lastDotIndex) : fileName;
+  
+  // Construct parallel output directory path (e.g., dirName/baseName-transcript)
+  const outputFolder = dirName ? `${dirName}/${baseName}-transcript` : `${baseName}-transcript`;
+  
+  // Define GCS file paths inside the output folder
+  const tempAudioPath = `${outputFolder}/temp.wav`;
+  const statusGcsPath = `${outputFolder}/status.json`;
+  const txtTranscriptPath = `${outputFolder}/transcript.txt`;
+  const jsonTranscriptPath = `${outputFolder}/transcript.json`;
 
   try {
     // 1. Update status to 'processing'
-    await gcsService.updateStatus(name, 'processing');
+    await gcsService.updateStatus(statusGcsPath, name, 'processing');
 
     // 2. Transcode Video to Audio via streams
     logger.log('[Pipeline] Transcoding video to audio...');
@@ -106,14 +116,14 @@ async function processVideoBackground(name, size) {
     await gcsService.uploadText(jsonTranscriptPath, JSON.stringify(json, null, 2), 'application/json');
 
     // 5. Update status to 'completed'
-    await gcsService.updateStatus(name, 'completed');
+    await gcsService.updateStatus(statusGcsPath, name, 'completed');
     logger.log(`[Pipeline] Completed processing for: ${name}`);
 
   } catch (error) {
     logger.error(`[Pipeline] Failed to process video ${name}:`, error);
     
     // Update status to 'failed' with error message
-    await gcsService.updateStatus(name, 'failed', error.message);
+    await gcsService.updateStatus(statusGcsPath, name, 'failed', error.message);
   } finally {
     // 6. Clean up temporary audio file from GCS
     try {
@@ -121,6 +131,14 @@ async function processVideoBackground(name, size) {
       await gcsService.deleteFile(tempAudioPath);
     } catch (cleanupErr) {
       logger.error(`[Pipeline] Failed to clean up temp audio ${tempAudioPath}:`, cleanupErr.message);
+    }
+
+    // 7. Clean up temporary status file from GCS
+    try {
+      logger.log(`[Pipeline] Cleaning up temporary status file: ${statusGcsPath}`);
+      await gcsService.deleteFile(statusGcsPath);
+    } catch (cleanupErr) {
+      logger.error(`[Pipeline] Failed to clean up status file ${statusGcsPath}:`, cleanupErr.message);
     }
   }
 }
